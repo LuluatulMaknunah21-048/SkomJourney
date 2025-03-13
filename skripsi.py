@@ -5,17 +5,28 @@ import pandas as pd
 from PIL import Image
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
+from oauth2client.service_account import ServiceAccountCredentials
+import json
 import random
 
-# Autentikasi Google Drive (hanya bisa digunakan di lokal, bukan Streamlit Cloud)
+# Load Google Drive API credentials
+CREDENTIALS_PATH = "service_account.json"
+if not os.path.exists(CREDENTIALS_PATH):
+    st.error("Service account credentials not found! Upload 'service_account.json' to proceed.")
+    st.stop()
+
+# Autentikasi menggunakan Service Account
+scope = ['https://www.googleapis.com/auth/drive']
+creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, scope)
 gauth = GoogleAuth()
-gauth.LocalWebserverAuth()
+gauth.credentials = creds
 drive = GoogleDrive(gauth)
 
 # ID Folder Google Drive tempat dataset disimpan
 FOLDER_ID = "19CSJcfY37bEIhuJE3W3DMFK9CpHxVTvp"
 
-# Fungsi untuk mendapatkan daftar file dalam folder def get_file_list(folder_id):
+# Fungsi untuk mendapatkan daftar file dalam folder
+def get_file_list(folder_id):
     file_list = drive.ListFile({'q': f"'{folder_id}' in parents and trashed=false"}).GetList()
     return {file['title']: file['id'] for file in file_list}
 
