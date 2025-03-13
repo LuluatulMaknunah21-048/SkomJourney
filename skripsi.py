@@ -40,7 +40,7 @@ def generate_dummy_image(class_name):
     return img
 
 # Streamlit UI
-st.title("🌈✨ Chest X-ray Dataset - Gen Z Vibes ✨🌈")
+st.title("🌈✨ Chest X-ray Dataset✨🌈")
 st.sidebar.header("⚙️ Settings")
 
 # Visualisasi distribusi data
