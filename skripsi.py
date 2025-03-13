@@ -1,67 +1,64 @@
 import streamlit as st
-import os
 import plotly.express as px
 import pandas as pd
-from PIL import Image
-from pydrive.auth import GoogleAuth
-from pydrive.drive import GoogleDrive
-from oauth2client.service_account import ServiceAccountCredentials
-import json
 import random
+from PIL import Image, ImageDraw
+import io
 
-# Load Google Drive API credentials
-CREDENTIALS_PATH = "service_account.json"
-if not os.path.exists(CREDENTIALS_PATH):
-    st.error("Service account credentials not found! Upload 'service_account.json' to proceed.")
-    st.stop()
+# Custom Streamlit Theme (Gen Z Vibes)
+st.markdown("""
+    <style>
+        body {
+            background-color: #FFC0CB;
+            color: #800080;
+        }
+        .stApp {
+            background-color: #FF69B4;
+        }
+        .stSidebar {
+            background-color: #FFB6C1;
+        }
+        .css-1d391kg {
+            color: #FF1493 !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# Autentikasi menggunakan Service Account
-scope = ['https://www.googleapis.com/auth/drive']
-creds = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_PATH, scope)
-gauth = GoogleAuth()
-gauth.credentials = creds
-drive = GoogleDrive(gauth)
+# Dummy data untuk jumlah gambar per kelas
+CLASS_DISTRIBUTION = {
+    "COVID-19": 5000,
+    "Pneumonia": 15000,
+    "Normal": 13920
+}
 
-# ID Folder Google Drive tempat dataset disimpan
-FOLDER_ID = "19CSJcfY37bEIhuJE3W3DMFK9CpHxVTvp"
-
-# Fungsi untuk mendapatkan daftar file dalam folder
-def get_file_list(folder_id):
-    file_list = drive.ListFile({'q': f"'{folder_id}' in parents and trashed=false"}).GetList()
-    return {file['title']: file['id'] for file in file_list}
-
-file_dict = get_file_list(FOLDER_ID)
+def generate_dummy_image(class_name):
+    """Buat gambar dummy berdasarkan kelas dengan warna Gen Z vibes."""
+    colors = {"COVID-19": "#FF1493", "Pneumonia": "#FFD700", "Normal": "#32CD32"}
+    img = Image.new("RGB", (200, 200), colors.get(class_name, "gray"))
+    draw = ImageDraw.Draw(img)
+    draw.text((50, 90), class_name, fill="white")
+    return img
 
 # Streamlit UI
-st.title("📊 Chest X-ray Dataset Visualization")
+st.title("🌈✨ Chest X-ray Dataset - Gen Z Vibes ✨🌈")
 st.sidebar.header("⚙️ Settings")
 
-# Dummy dataset jika gagal load
-dummy_data = pd.DataFrame({'Class': ['COVID-19', 'Pneumonia', 'Normal'], 'Count': [5000, 15000, 13920]})
-
-# Pilih dataset
-dataset_option = st.sidebar.selectbox("Select Dataset:", ['Train', 'Validation', 'Test'])
-
-# Simulasi jumlah gambar per kategori (fallback jika tidak bisa akses GDrive)
-data_df = dummy_data
-
-fig = px.bar(data_df, x='Class', y='Count', title=f"Class Distribution in {dataset_option} Dataset",
+# Visualisasi distribusi data
+data_df = pd.DataFrame(list(CLASS_DISTRIBUTION.items()), columns=['Class', 'Count'])
+fig = px.bar(data_df, x='Class', y='Count', title="🔥 Class Distribution in Dataset 🔥",
              color='Class', text='Count', template='plotly_dark')
 st.plotly_chart(fig)
 
-# Preview beberapa gambar
-st.subheader("📷 Sample X-ray Images")
-num_images = st.slider("Select Number of Images to Display", 1, 10, 5)
-selected_class = st.selectbox("Choose Class:", data_df['Class'].tolist())
+# Pilihan kelas gambar
+st.subheader("💖 Sample X-ray Images 💖")
+selected_class = st.selectbox("🎀 Choose Class:", list(CLASS_DISTRIBUTION.keys()))
+num_images = st.slider("💎 Select Number of Images to Display", 1, 10, 5)
 
-# Ambil beberapa gambar dari Google Drive
-if file_dict:
-    selected_images = random.sample(list(file_dict.keys()), min(num_images, len(file_dict)))
-    cols = st.columns(min(5, num_images))
-    for idx, img_name in enumerate(selected_images):
-        img_id = file_dict[img_name]
-        img_url = f"https://drive.google.com/uc?id={img_id}"
-        with cols[idx % len(cols)]:
-            st.image(img_url, caption=img_name, use_column_width=True)
-else:
-    st.warning("Dataset not accessible. Showing sample data.")
+# Tampilkan gambar dummy
+cols = st.columns(min(5, num_images))
+for i in range(num_images):
+    with cols[i % len(cols)]:
+        img = generate_dummy_image(selected_class)
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='PNG')
+        st.image(img_bytes.getvalue(), caption=f"✨ {selected_class} {i+1} ✨", use_column_width=True)
