@@ -3,52 +3,37 @@ import os
 import plotly.express as px
 import pandas as pd
 from PIL import Image
-import gdown
-import zipfile
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+import random
 
-# URL Google Drive (ubah sesuai dengan dataset yang dikompresi jadi ZIP)
-GDRIVE_URL = "https://drive.google.com/uc?id=19CSJcfY37bEIhuJE3W3DMFK9CpHxVTvp"
-ZIP_FILE = "dataset.zip"
-EXTRACT_DIR = "dataset"
+# Autentikasi Google Drive (hanya bisa digunakan di lokal, bukan Streamlit Cloud)
+gauth = GoogleAuth()
+gauth.LocalWebserverAuth()
+drive = GoogleDrive(gauth)
 
-# Cek apakah dataset sudah diunduh
-if not os.path.exists(EXTRACT_DIR):
-    st.info("Downloading dataset from Google Drive...")
-    gdown.download(GDRIVE_URL, ZIP_FILE, quiet=False)
-    
-    # Ekstrak dataset
-    with zipfile.ZipFile(ZIP_FILE, "r") as zip_ref:
-        zip_ref.extractall(EXTRACT_DIR)
+# ID Folder Google Drive tempat dataset disimpan
+FOLDER_ID = "19CSJcfY37bEIhuJE3W3DMFK9CpHxVTvp"
 
-BASE_DIR = os.path.join(EXTRACT_DIR, "Dataset")
-TRAIN_DIR = os.path.join(BASE_DIR, "Train")
-VAL_DIR = os.path.join(BASE_DIR, "Val")
-TEST_DIR = os.path.join(BASE_DIR, "Test")
+# Fungsi untuk mendapatkan daftar file dalam folder def get_file_list(folder_id):
+    file_list = drive.ListFile({'q': f"'{folder_id}' in parents and trashed=false"}).GetList()
+    return {file['title']: file['id'] for file in file_list}
 
-# Fungsi untuk mengambil jumlah gambar per kategori
-def count_images(directory):
-    if not os.path.exists(directory):
-        return pd.DataFrame({'Class': ['COVID-19', 'Pneumonia', 'Normal'], 'Count': [5000, 15000, 13920]})
-    
-    categories = os.listdir(directory)
-    data = {category: len(os.listdir(os.path.join(directory, category))) for category in categories}
-    return pd.DataFrame(list(data.items()), columns=['Class', 'Count'])
+file_dict = get_file_list(FOLDER_ID)
 
 # Streamlit UI
 st.title("📊 Chest X-ray Dataset Visualization")
 st.sidebar.header("⚙️ Settings")
 
-# Pilih dataset (Train, Val, Test)
+# Dummy dataset jika gagal load
+dummy_data = pd.DataFrame({'Class': ['COVID-19', 'Pneumonia', 'Normal'], 'Count': [5000, 15000, 13920]})
+
+# Pilih dataset
 dataset_option = st.sidebar.selectbox("Select Dataset:", ['Train', 'Validation', 'Test'])
 
-if dataset_option == 'Train':
-    data_df = count_images(TRAIN_DIR)
-elif dataset_option == 'Validation':
-    data_df = count_images(VAL_DIR)
-else:
-    data_df = count_images(TEST_DIR)
+# Simulasi jumlah gambar per kategori (fallback jika tidak bisa akses GDrive)
+data_df = dummy_data
 
-# Plot distribusi data
 fig = px.bar(data_df, x='Class', y='Count', title=f"Class Distribution in {dataset_option} Dataset",
              color='Class', text='Count', template='plotly_dark')
 st.plotly_chart(fig)
@@ -58,14 +43,14 @@ st.subheader("📷 Sample X-ray Images")
 num_images = st.slider("Select Number of Images to Display", 1, 10, 5)
 selected_class = st.selectbox("Choose Class:", data_df['Class'].tolist())
 
-img_dir = os.path.join(BASE_DIR, dataset_option, selected_class)
-if os.path.exists(img_dir):
-    image_files = os.listdir(img_dir)[:num_images]
+# Ambil beberapa gambar dari Google Drive
+if file_dict:
+    selected_images = random.sample(list(file_dict.keys()), min(num_images, len(file_dict)))
     cols = st.columns(min(5, num_images))
-    for idx, img_file in enumerate(image_files):
-        img_path = os.path.join(img_dir, img_file)
-        image = Image.open(img_path)
+    for idx, img_name in enumerate(selected_images):
+        img_id = file_dict[img_name]
+        img_url = f"https://drive.google.com/uc?id={img_id}"
         with cols[idx % len(cols)]:
-            st.image(image, caption=img_file, use_column_width=True)
+            st.image(img_url, caption=img_name, use_column_width=True)
 else:
-    st.warning("Dataset not found. Showing sample data.")
+    st.warning("Dataset not accessible. Showing sample data.")
